@@ -77,8 +77,8 @@
 
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
                     <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
-                        <p class="text-[10px] uppercase text-slate-500 font-bold">Budget Used</p>
-                        <p id="budget-spent" class="text-lg font-mono font-bold text-blue-400">0 / 100</p>
+                        <p class="text-[10px] uppercase text-slate-500 font-bold">Budget Left</p>
+                        <p id="budget-left" class="text-lg font-mono font-bold text-blue-400">100 / 100</p>
                     </div>
                     <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
                         <p class="text-[10px] uppercase text-slate-500 font-bold">Players</p>
@@ -145,6 +145,9 @@
                     <option value="KKR">KOLKATA</option>
                     <option value="RR">RAJASTHAN</option>
                     <option value="CSK">CHENNAI</option>
+                </select>
+                <select id="price-filter" class="bg-slate-800 border border-slate-700 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Prices</option>
                 </select>
             </div>
 
@@ -305,11 +308,12 @@
         // DOM Elements
         const playerTableBody = document.getElementById('player-table-body');
         const selectedList = document.getElementById('selected-list');
-        const budgetSpentEl = document.getElementById('budget-spent');
+        const budgetLeftEl = document.getElementById('budget-left');
         const playerCountEl = document.getElementById('player-count');
         const teamCountEl = document.getElementById('team-count');
         const searchInput = document.getElementById('player-search');
         const teamFilter = document.getElementById('team-filter');
+        const priceFilter = document.getElementById('price-filter');
         const budgetProgress = document.getElementById('budget-progress');
         const submitBtn = document.getElementById('submit-btn');
         const validationBox = document.getElementById('validation-errors');
@@ -319,11 +323,13 @@
         function renderPlayers() {
             const searchTerm = searchInput.value.toLowerCase();
             const filterTeam = teamFilter.value;
+            const filterPrice = priceFilter.value;
 
             const filtered = PLAYER_DB.filter(p => {
-                const matchesSearch = p.name.toLowerCase().includes(searchTerm) || p.team.toLowerCase().includes(searchTerm);
+                const matchesSearch = p.name.toLowerCase().includes(searchTerm) || p.team.toLowerCase().includes(searchTerm) || p.price.toString().includes(searchTerm);
                 const matchesTeam = filterTeam === 'all' || p.team === filterTeam;
-                return matchesSearch && matchesTeam;
+                const matchesPrice = filterPrice === 'all' || p.price == filterPrice;
+                return matchesSearch && matchesTeam && matchesPrice;
             });
 
             playerTableBody.innerHTML = filtered.map(p => {
@@ -364,7 +370,8 @@
                     showError("Squad is full (11 players max).");
                     return;
                 }
-                if (budgetUsed + player.price > BUDGET_LIMIT) {
+                const currentBudget = selectedPlayers.reduce((sum, p) => sum + p.price, 0);
+                if (currentBudget + player.price > BUDGET_LIMIT) {
                     showError(`Cannot afford ${player.name}. Budget exceeded!`);
                     return;
                 }
@@ -385,10 +392,11 @@
 
         function updateUI() {
             budgetUsed = selectedPlayers.reduce((sum, p) => sum + p.price, 0);
+            budgetLeft = BUDGET_LIMIT - budgetUsed;
             const uniqueTeams = new Set(selectedPlayers.map(p => p.team));
             
             // Updates Top Bar
-            budgetSpentEl.textContent = `${budgetUsed.toFixed(1)} / 100`;
+            budgetLeftEl.textContent = `${budgetLeft.toFixed(0)} / 100`;
             playerCountEl.textContent = `${selectedPlayers.length} / 11`;
             teamCountEl.textContent = `${uniqueTeams.size} / 10`;
             
@@ -462,6 +470,7 @@
         // Search/Filter Listeners
         searchInput.addEventListener('input', renderPlayers);
         teamFilter.addEventListener('change', renderPlayers);
+        priceFilter.addEventListener('change', renderPlayers);
 
         // Responsive Sidebar
         document.getElementById('view-squad-btn').addEventListener('click', () => {
@@ -472,6 +481,13 @@
         });
 
         // Init
+        const prices = [...new Set(PLAYER_DB.map(p => p.price))].sort((a, b) => a - b);
+        prices.forEach(price => {
+            const option = document.createElement('option');
+            option.value = price;
+            option.textContent = price;
+            priceFilter.appendChild(option);
+        });
         renderPlayers();
     </script>
 </body>
