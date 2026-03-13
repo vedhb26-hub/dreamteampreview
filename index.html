@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Cricket Team Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .team-card {
+            transition: all 0.2s ease;
+        }
+
+        .team-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+
+        .player-row:nth-child(even) {
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+
+        .selected-row {
+            background-color: rgba(59, 130, 246, 0.2) !important;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .badge-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .sticky-header {
+            backdrop-filter: blur(12px);
+            background-color: rgba(15, 23, 42, 0.9);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Top Sticky Dashboard -->
+    <header class="sticky top-0 z-50 border-b border-slate-700 sticky-header shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-cricket-bat-ball text-blue-500"></i>
+                        Squad Builder
+                    </h1>
+                    <p class="text-slate-400 text-xs">Rule: 11 Players, 10 Teams (1 Team with 2 players)</p>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
+                    <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                        <p class="text-[10px] uppercase text-slate-500 font-bold">Budget Used</p>
+                        <p id="budget-spent" class="text-lg font-mono font-bold text-blue-400">0 / 100</p>
+                    </div>
+                    <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                        <p class="text-[10px] uppercase text-slate-500 font-bold">Players</p>
+                        <p id="player-count" class="text-lg font-mono font-bold text-emerald-400">0 / 11</p>
+                    </div>
+                    <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                        <p class="text-[10px] uppercase text-slate-500 font-bold">Teams Covered</p>
+                        <p id="team-count" class="text-lg font-mono font-bold text-amber-400">0 / 10</p>
+                    </div>
+                    <button id="view-squad-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-users"></i>
+                        <span class="hidden sm:inline">Squad</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-800 h-1 mt-4 rounded-full overflow-hidden">
+                <div id="budget-progress" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Sidebar: Squad List (Hidden on Mobile, Visible in Modal/Side) -->
+        <aside id="squad-sidebar" class="lg:col-span-4 space-y-4">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 sticky top-40">
+                <h2 class="text-xl font-bold mb-4 flex items-center justify-between">
+                    Selected Squad
+                    <span id="squad-status" class="text-[10px] bg-slate-700 px-2 py-1 rounded text-slate-300">Incomplete</span>
+                </h2>
+                <div id="selected-list" class="space-y-3 min-h-[400px] max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                    <p class="text-slate-500 text-center py-10 italic">No players selected yet...</p>
+                </div>
+                
+                <div id="validation-errors" class="mt-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg hidden">
+                    <p class="text-red-400 text-xs"></p>
+                </div>
+
+                <button id="submit-btn" disabled class="w-full mt-6 py-3 rounded-lg bg-slate-700 text-slate-500 font-bold cursor-not-allowed transition-all">
+                    FINALISE SQUAD
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content: Player Database -->
+        <section class="lg:col-span-8">
+            <!-- Search and Filter -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <div class="flex-1 relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="player-search" placeholder="Search name, team or price..." class="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <select id="team-filter" class="bg-slate-800 border border-slate-700 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Teams</option>
+                    <option value="RCB">RCB</option>
+                    <option value="PBKS">PUNJAB</option>
+                    <option value="MI">MUMBAI</option>
+                    <option value="GT">GUJARAT</option>
+                    <option value="DC">DELHI</option>
+                    <option value="SRH">HYDERABAD</option>
+                    <option value="LSG">LUCKNOW</option>
+                    <option value="KKR">KOLKATA</option>
+                    <option value="RR">RAJASTHAN</option>
+                    <option value="CSK">CHENNAI</option>
+                </select>
+            </div>
+
+            <!-- Player Table -->
+            <div class="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-800/80 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4">ID</th>
+                            <th class="px-6 py-4">Player</th>
+                            <th class="px-6 py-4">Team</th>
+                            <th class="px-6 py-4">Price</th>
+                            <th class="px-6 py-4 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-table-body" class="text-sm">
+                        <!-- JS injected -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-blue-500 rounded-2xl max-w-md w-full p-8 text-center">
+            <div class="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 badge-pulse">
+                <i class="fas fa-check text-4xl text-white"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-2">Squad Complete!</h3>
+            <p class="text-slate-400 mb-6">Your team is ready for the tournament.</p>
+            <div class="bg-slate-900 rounded-lg p-4 mb-6">
+                <p class="text-xs text-slate-500 uppercase font-bold">Total Spend</p>
+                <p id="final-cost" class="text-3xl font-mono font-bold text-blue-400">99.5</p>
+            </div>
+            <button onclick="location.reload()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold transition-colors">
+                Build Another Team
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Full Dataset extracted from provided images
+        const PLAYER_DB = [
+            // RCB
+            { id: 1, name: "Rajat Patidar", team: "RCB", price: 9, color: "bg-red-600" },
+            { id: 2, name: "Devdutt Padikkal", team: "RCB", price: 7, color: "bg-red-600" },
+            { id: 3, name: "Virat Kohli", team: "RCB", price: 12, color: "bg-red-600" },
+            { id: 4, name: "Phil Salt", team: "RCB", price: 11, color: "bg-red-600" },
+            { id: 5, name: "Jitesh Sharma", team: "RCB", price: 7, color: "bg-red-600" },
+            { id: 6, name: "Krunal Pandya", team: "RCB", price: 7, color: "bg-red-600" },
+            { id: 7, name: "Tim David", team: "RCB", price: 9, color: "bg-red-600" },
+            { id: 9, name: "Romario Shepherd", team: "RCB", price: 7, color: "bg-red-600" },
+            { id: 10, name: "Jacob Bethell", team: "RCB", price: 5, color: "bg-red-600" },
+            { id: 11, name: "Josh Hazlewood", team: "RCB", price: 12, color: "bg-red-600" },
+            { id: 12, name: "Rasikh Dar", team: "RCB", price: 2, color: "bg-red-600" },
+            { id: 13, name: "Suyash Sharma", team: "RCB", price: 4, color: "bg-red-600" },
+            { id: 14, name: "Bhuvneshwar Kumar", team: "RCB", price: 8, color: "bg-red-600" },
+            { id: 15, name: "Nuwan Thushara", team: "RCB", price: 3, color: "bg-red-600" },
+            { id: 17, name: "Yash Dayal", team: "RCB", price: 5, color: "bg-red-600" },
+            { id: 19, name: "Venkatesh Iyer", team: "RCB", price: 5, color: "bg-red-600" },
+            { id: 25, name: "Jacob Duffy", team: "RCB", price: 7, color: "bg-red-600" },
+
+            // PUNJAB (PBKS)
+            { id: 26, name: "Shreyas Iyer", team: "PBKS", price: 11, color: "bg-red-500" },
+            { id: 27, name: "Nehal Wadhera", team: "PBKS", price: 7, color: "bg-red-500" },
+            { id: 31, name: "Prabhsimran Singh", team: "PBKS", price: 8, color: "bg-red-500" },
+            { id: 32, name: "Shashank Singh", team: "PBKS", price: 8, color: "bg-red-500" },
+            { id: 33, name: "Marcus Stoinis", team: "PBKS", price: 7, color: "bg-red-500" },
+            { id: 34, name: "Harpreet Brar", team: "PBKS", price: 6, color: "bg-red-500" },
+            { id: 35, name: "Marco Jansen", team: "PBKS", price: 9, color: "bg-red-500" },
+            { id: 36, name: "Azmatullah Omarzai", team: "PBKS", price: 7, color: "bg-red-500" },
+            { id: 37, name: "Priyansh Arya", team: "PBKS", price: 8, color: "bg-red-500" },
+            { id: 38, name: "Musheer Khan", team: "PBKS", price: 4, color: "bg-red-500" },
+            { id: 41, name: "Arshdeep Singh", team: "PBKS", price: 10, color: "bg-red-500" },
+            { id: 42, name: "Yuzvendra Chahal", team: "PBKS", price: 8, color: "bg-red-500" },
+            { id: 44, name: "Yash Thakur", team: "PBKS", price: 4, color: "bg-red-500" },
+            { id: 46, name: "Lockie Ferguson", team: "PBKS", price: 8, color: "bg-red-500" },
+
+            // MUMBAI (MI)
+            { id: 51, name: "Hardik Pandya", team: "MI", price: 13, color: "bg-blue-600" },
+            { id: 52, name: "Rohit Sharma", team: "MI", price: 10, color: "bg-blue-600" },
+            { id: 53, name: "Suryakumar Yadav", team: "MI", price: 10, color: "bg-blue-600" },
+            { id: 55, name: "Sherfane Rutherford", team: "MI", price: 8, color: "bg-blue-600" },
+            { id: 57, name: "Tilak Varma", team: "MI", price: 7, color: "bg-blue-600" },
+            { id: 62, name: "Will Jacks", team: "MI", price: 8, color: "bg-blue-600" },
+            { id: 64, name: "Trent Boult", team: "MI", price: 10, color: "bg-blue-600" },
+            { id: 66, name: "Deepak Chahar", team: "MI", price: 7, color: "bg-blue-600" },
+            { id: 70, name: "Jasprit Bumrah", team: "MI", price: 13, color: "bg-blue-600" },
+            { id: 71, name: "Quinton De Kock", team: "MI", price: 8, color: "bg-blue-600" },
+
+            // GUJARAT (GT)
+            { id: 76, name: "Shubman Gill", team: "GT", price: 11, color: "bg-slate-900" },
+            { id: 77, name: "Jos Buttler", team: "GT", price: 9, color: "bg-slate-900" },
+            { id: 82, name: "Washington Sundar", team: "GT", price: 8, color: "bg-slate-900" },
+            { id: 86, name: "Sai Sudharsan", team: "GT", price: 10, color: "bg-slate-900" },
+            { id: 88, name: "Kagiso Rabada", team: "GT", price: 8, color: "bg-slate-900" },
+            { id: 89, name: "Mohammed Siraj", team: "GT", price: 9, color: "bg-slate-900" },
+            { id: 95, name: "Rashid Khan", team: "GT", price: 8, color: "bg-slate-900" },
+
+            // DELHI (DC)
+            { id: 101, name: "Axar Patel", team: "DC", price: 11, color: "bg-blue-500" },
+            { id: 102, name: "KL Rahul", team: "DC", price: 10, color: "bg-blue-500" },
+            { id: 112, name: "Mitchell Starc", team: "DC", price: 10, color: "bg-blue-500" },
+            { id: 117, name: "Kuldeep Yadav", team: "DC", price: 10, color: "bg-blue-500" },
+            { id: 119, name: "David Miller", team: "DC", price: 9, color: "bg-blue-500" },
+            { id: 120, name: "Ben Duckett", team: "DC", price: 8, color: "bg-blue-500" },
+            { id: 124, name: "Nitish Rana", team: "DC", price: 7, color: "bg-blue-500" },
+
+            // HYDERABAD (SRH)
+            { id: 126, name: "Pat Cummins", team: "SRH", price: 10, color: "bg-orange-500" },
+            { id: 127, name: "Travis Head", team: "SRH", price: 10, color: "bg-orange-500" },
+            { id: 128, name: "Ishan Kishan", team: "SRH", price: 12, color: "bg-orange-500" },
+            { id: 131, name: "Heinrich Klaasen", team: "SRH", price: 10, color: "bg-orange-500" },
+            { id: 133, name: "Abhishek Sharma", team: "SRH", price: 13, color: "bg-orange-500" },
+            { id: 141, name: "Liam Livingstone", team: "SRH", price: 8, color: "bg-orange-500" },
+
+            // LUCKNOW (LSG)
+            { id: 151, name: "Rishabh Pant", team: "LSG", price: 8, color: "bg-blue-800" },
+            { id: 153, name: "Aiden Markram", team: "LSG", price: 11, color: "bg-blue-800" },
+            { id: 157, name: "Nicholas Pooran", team: "LSG", price: 12, color: "bg-blue-800" },
+            { id: 164, name: "Wanindu Hasaranga", team: "LSG", price: 10, color: "bg-blue-800" },
+            { id: 165, name: "Mohammad Shami", team: "LSG", price: 8, color: "bg-blue-800" },
+            { id: 172, name: "Anrich Nortje", team: "LSG", price: 7, color: "bg-blue-800" },
+
+            // KOLKATA (KKR)
+            { id: 177, name: "Sunil Narine", team: "KKR", price: 11, color: "bg-purple-800" },
+            { id: 181, name: "Cameron Green", team: "KKR", price: 9, color: "bg-purple-800" },
+            { id: 182, name: "Finn Allen", team: "KKR", price: 10, color: "bg-purple-800" },
+            { id: 193, name: "Varun Chakravarthy", team: "KKR", price: 12, color: "bg-purple-800" },
+            { id: 194, name: "Matheesha Pathirana", team: "KKR", price: 10, color: "bg-purple-800" },
+
+            // RAJASTHAN (RR)
+            { id: 201, name: "Yashasvi Jaiswal", team: "RR", price: 12, color: "bg-pink-500" },
+            { id: 209, name: "Shimron Hetmyer", team: "RR", price: 10, color: "bg-pink-500" },
+            { id: 211, name: "Ravindra Jadeja", team: "RR", price: 8, color: "bg-pink-500" },
+            { id: 212, name: "Sam Curran", team: "RR", price: 9, color: "bg-pink-500" },
+            { id: 214, name: "Jofra Archer", team: "RR", price: 11, color: "bg-pink-500" },
+
+            // CHENNAI (CSK)
+            { id: 226, name: "Ruturaj Gaikwad", team: "CSK", price: 9, color: "bg-yellow-400" },
+            { id: 227, name: "MS Dhoni", team: "CSK", price: 7, color: "bg-yellow-400" },
+            { id: 228, name: "Sanju Samson", team: "CSK", price: 11, color: "bg-yellow-400" },
+            { id: 230, name: "Dewald Brevis", team: "CSK", price: 10, color: "bg-yellow-400" },
+            { id: 234, name: "Shivam Dube", team: "CSK", price: 9, color: "bg-yellow-400" },
+            { id: 244, name: "Noor Ahmad", team: "CSK", price: 10, color: "bg-yellow-400" },
+            { id: 246, name: "Nathan Ellis", team: "CSK", price: 9, color: "bg-yellow-400" },
+        ];
+
+        const TEAMS = ["RCB", "PBKS", "MI", "GT", "DC", "SRH", "LSG", "KKR", "RR", "CSK"];
+
+        // Application State
+        let selectedPlayers = [];
+        let budgetUsed = 0;
+        const BUDGET_LIMIT = 100;
+        const SQUAD_SIZE = 11;
+
+        // DOM Elements
+        const playerTableBody = document.getElementById('player-table-body');
+        const selectedList = document.getElementById('selected-list');
+        const budgetSpentEl = document.getElementById('budget-spent');
+        const playerCountEl = document.getElementById('player-count');
+        const teamCountEl = document.getElementById('team-count');
+        const searchInput = document.getElementById('player-search');
+        const teamFilter = document.getElementById('team-filter');
+        const budgetProgress = document.getElementById('budget-progress');
+        const submitBtn = document.getElementById('submit-btn');
+        const validationBox = document.getElementById('validation-errors');
+        const squadStatus = document.getElementById('squad-status');
+
+        // Initialize Table
+        function renderPlayers() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filterTeam = teamFilter.value;
+
+            const filtered = PLAYER_DB.filter(p => {
+                const matchesSearch = p.name.toLowerCase().includes(searchTerm) || p.team.toLowerCase().includes(searchTerm);
+                const matchesTeam = filterTeam === 'all' || p.team === filterTeam;
+                return matchesSearch && matchesTeam;
+            });
+
+            playerTableBody.innerHTML = filtered.map(p => {
+                const isSelected = selectedPlayers.some(sp => sp.id === p.id);
+                return `
+                    <tr class="player-row transition-colors ${isSelected ? 'selected-row' : ''}">
+                        <td class="px-6 py-4 font-mono text-slate-500">#${p.id.toString().padStart(3, '0')}</td>
+                        <td class="px-6 py-4 font-medium text-white">${p.name}</td>
+                        <td class="px-6 py-4">
+                            <span class="${p.color} px-2 py-1 rounded text-[10px] font-bold text-white shadow-sm">
+                                ${p.team}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 font-mono font-bold text-blue-400">${p.price}</td>
+                        <td class="px-6 py-4 text-center">
+                            <button 
+                                onclick="togglePlayer(${p.id})"
+                                class="w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-red-500/20 text-red-500 border border-red-500' : 'bg-blue-600/20 text-blue-500 border border-blue-600 hover:bg-blue-600 hover:text-white'}"
+                            >
+                                <i class="fas ${isSelected ? 'fa-minus' : 'fa-plus'}"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function togglePlayer(id) {
+            const player = PLAYER_DB.find(p => p.id === id);
+            const index = selectedPlayers.findIndex(p => p.id === id);
+
+            if (index > -1) {
+                // Remove
+                selectedPlayers.splice(index, 1);
+            } else {
+                // Validation before adding
+                if (selectedPlayers.length >= SQUAD_SIZE) {
+                    showError("Squad is full (11 players max).");
+                    return;
+                }
+                if (budgetUsed + player.price > BUDGET_LIMIT) {
+                    showError(`Cannot afford ${player.name}. Budget exceeded!`);
+                    return;
+                }
+
+                // Team rule: Max 2 from any team
+                const teamCount = selectedPlayers.filter(p => p.team === player.team).length;
+                if (teamCount >= 2) {
+                    showError(`You already have 2 players from ${player.team}.`);
+                    return;
+                }
+
+                selectedPlayers.push(player);
+            }
+
+            updateUI();
+            renderPlayers();
+        }
+
+        function updateUI() {
+            budgetUsed = selectedPlayers.reduce((sum, p) => sum + p.price, 0);
+            const uniqueTeams = new Set(selectedPlayers.map(p => p.team));
+            
+            // Updates Top Bar
+            budgetSpentEl.textContent = `${budgetUsed.toFixed(1)} / 100`;
+            playerCountEl.textContent = `${selectedPlayers.length} / 11`;
+            teamCountEl.textContent = `${uniqueTeams.size} / 10`;
+            
+            // Progress Bar
+            const budgetPerc = (budgetUsed / BUDGET_LIMIT) * 100;
+            budgetProgress.style.width = `${budgetPerc}%`;
+            budgetProgress.className = `h-full transition-all duration-500 ${budgetPerc > 90 ? 'bg-red-500' : budgetPerc > 75 ? 'bg-amber-500' : 'bg-blue-500'}`;
+
+            // Render Selected List
+            if (selectedPlayers.length === 0) {
+                selectedList.innerHTML = `<p class="text-slate-500 text-center py-10 italic">No players selected yet...</p>`;
+            } else {
+                selectedList.innerHTML = selectedPlayers.map(p => `
+                    <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600/50">
+                        <div class="flex items-center gap-3">
+                            <span class="${p.color} w-2 h-8 rounded-full"></span>
+                            <div>
+                                <p class="text-sm font-bold text-white leading-none">${p.name}</p>
+                                <p class="text-[10px] text-slate-400 mt-1">${p.team} • Price: ${p.price}</p>
+                            </div>
+                        </div>
+                        <button onclick="togglePlayer(${p.id})" class="text-slate-400 hover:text-red-500 transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            validateSquad();
+        }
+
+        function validateSquad() {
+            const errors = [];
+            const uniqueTeams = new Set(selectedPlayers.map(p => p.team));
+            
+            if (selectedPlayers.length < 11) errors.push(`Need ${11 - selectedPlayers.length} more players.`);
+            if (uniqueTeams.size < 10) errors.push(`Need players from ${10 - uniqueTeams.size} more teams.`);
+
+            if (errors.length > 0) {
+                validationBox.classList.remove('hidden');
+                validationBox.querySelector('p').innerHTML = errors.join('<br>');
+                submitBtn.disabled = true;
+                submitBtn.className = "w-full mt-6 py-3 rounded-lg bg-slate-700 text-slate-500 font-bold cursor-not-allowed transition-all";
+                squadStatus.textContent = "Incomplete";
+                squadStatus.className = "text-[10px] bg-slate-700 px-2 py-1 rounded text-slate-300";
+            } else {
+                validationBox.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.className = "w-full mt-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer transition-all shadow-lg shadow-blue-500/20";
+                squadStatus.textContent = "Ready";
+                squadStatus.className = "text-[10px] bg-emerald-500/20 px-2 py-1 rounded text-emerald-400";
+            }
+        }
+
+        function showError(msg) {
+            // Simple toast alternative
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl z-[200] animate-bounce";
+            toast.innerHTML = `<i class="fas fa-triangle-exclamation mr-2"></i> ${msg}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Finalize Logic
+        submitBtn.addEventListener('click', () => {
+            if (submitBtn.disabled) return;
+            document.getElementById('final-cost').textContent = budgetUsed.toFixed(1);
+            document.getElementById('success-modal').classList.remove('hidden');
+        });
+
+        // Search/Filter Listeners
+        searchInput.addEventListener('input', renderPlayers);
+        teamFilter.addEventListener('change', renderPlayers);
+
+        // Responsive Sidebar
+        document.getElementById('view-squad-btn').addEventListener('click', () => {
+            const sidebar = document.getElementById('squad-sidebar');
+            sidebar.scrollIntoView({ behavior: 'smooth' });
+            sidebar.classList.add('ring-4', 'ring-blue-500/30');
+            setTimeout(() => sidebar.classList.remove('ring-4', 'ring-blue-500/30'), 2000);
+        });
+
+        // Init
+        renderPlayers();
+    </script>
+</body>
+</html>
